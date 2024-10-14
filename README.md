@@ -5,5 +5,6 @@ command: \
 ```bash
 git checkout -b [your_branch_name]
 ```
+**Important: branch names can't have some characters like spaces check for the constraints online**
 
 Any new information and notes will be posted here
