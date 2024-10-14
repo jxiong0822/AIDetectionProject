@@ -2,7 +2,7 @@
 
 All the Assignments have their directory, create your own branch using the following command and push your changes into your own branches for each assignment
 command: \
-'''
+'''bash
 git checkout -b [your_branch_name]
 '''
 
