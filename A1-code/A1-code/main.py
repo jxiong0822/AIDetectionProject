@@ -23,11 +23,12 @@ def read_data(path):
     try:
         test_frame = pd.read_csv(path + 'test.csv')
     except:
+        dev_frame = train_frame
         test_frame = train_frame
 
-    return train_frame, test_frame
+    return train_frame, dev_frame, test_frame
 
-#change
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--model', '-m', type=str, default='AlwaysPredictZero',
@@ -38,7 +39,7 @@ def main():
     args = parser.parse_args()
     print(args)
 
-    train_frame, test_frame = read_data(args.path)
+    train_frame, dev_frame, test_frame = read_data(args.path)
 
     # Convert text into features
     if args.feature == "unigram":
@@ -55,13 +56,29 @@ def main():
     for i in range(0, len(train_frame['text'])):
         tokenized_text.append(tokenize(train_frame['text'][i]))
 
-    feat_extractor.fit(tokenized_text)
+    WordTable = feat_extractor.fit(tokenized_text)
 
     # form train set for training
     X_train = feat_extractor.transform_list(tokenized_text)
     Y_train = train_frame['label']
 
-
+    import random
+    # form dev set for evaluation
+    tokenized_text = []
+    for i in range(0, len(dev_frame['text'])):
+        tokenized_text.append(tokenize(dev_frame['text'][i]))
+    X_dev = feat_extractor.transform_list(tokenized_text)
+    Y_dev = dev_frame['label']
+    
+    # find random X_DEV
+    
+    num = random.randint(0, len(X_dev) - 10)
+    X_dev = X_dev[num:num + 10]
+    Y_dev = Y_dev[num:num + 10]
+    # print(X_dev, Y_dev)
+    # print("\n\n\n\n\n")
+    # print(Y_dev)
+    
     # form test set for evaluation
     tokenized_text = []
     for i in range(0, len(test_frame['text'])):
@@ -81,16 +98,30 @@ def main():
     else:
         raise Exception("Pass AlwaysPositive, NaiveBayes, LogisticRegression to --model")
 
-
     start_time = time.time()
     model.fit(X_train,Y_train)
+    
     print("===== Train Accuracy =====")
-    accuracy(model.predict(X_train), Y_train)
+    maxtrain, mintrain, restrain = model.predict(X_train)
+    accuracy(restrain, Y_train)
+    
+    print("===== Dev Accuracy =====")
+    maxdev, mindev, resdev = model.predict(X_dev)
+    accuracy(resdev, Y_dev)
     
     print("===== Test Accuracy =====")
-    accuracy(model.predict(X_test), Y_test)
-
-    print("Time for training and test: %.2f seconds" % (time.time() - start_time))
+    maxtest, mintest, restest = model.predict(X_test)
+    accuracy(restest, Y_test)
+    print("Max Ratios:\n")
+    for ratio, element in maxtest:
+        print(f"ratio is {ratio}, element is {list(WordTable.keys())[element]}\n")
+    
+    print("Min Ratios:\n")
+    for ratio, element in mintest:
+        print(f"ratio is {ratio}, element is {list(WordTable.keys())[element]}\n")
+        
+    
+    print("Time for training, dev, and test: %.2f seconds" % (time.time() - start_time))
 
 
 
