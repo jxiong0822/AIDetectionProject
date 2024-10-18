@@ -17,8 +17,10 @@ def read_data(path):
 
     # You can form your test set from train set
     # We will use our test set to evaluate your model
+    dev_frame = pd.read_csv(path + 'dev.csv')
+
+    train_frame = train_frame._append(dev_frame, ignore_index=True)
     try:
-        dev_frame = pd.read_csv(path + 'dev.csv')
         test_frame = pd.read_csv(path + 'test.csv')
     except:
         dev_frame = train_frame
