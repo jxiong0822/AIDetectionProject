@@ -48,17 +48,15 @@ class NaiveBayesClassifier(BinaryClassifier):
     """
     def __init__(self):
         # Add your code here!
-        raise Exception("Must be implemented")
-        
+        pass
 
     def fit(self, X, Y):
         # Add your code here!
-        raise Exception("Must be implemented")
-        
-    
+        pass
+
     def predict(self, X):
         # Add your code here!
-        raise Exception("Must be implemented")
+        pass
 
 # TODO: Implement this
 class LogisticRegressionClassifier(BinaryClassifier):
@@ -66,17 +64,36 @@ class LogisticRegressionClassifier(BinaryClassifier):
     """
     def __init__(self):
         # Add your code here!
-        raise Exception("Must be implemented")
-        
+        self.learning_rate = 0.15
+        self.epochs = 5000
+        self.weights = None
+        self.bias = None        
 
     def fit(self, X, Y):
         # Add your code here!
-        raise Exception("Must be implemented")
+        self.weights = np.zeros(X.shape[1])
+        self.bias = 0
+        for epoch in range(self.epochs):
+            z = np.dot(X, self.weights) + self.bias
+            y_pred = 1 / (1 + np.exp(-z))
+
+            dw = 1/X.shape[0] * np.dot(X.T, (y_pred - Y)) 
+            db = 1/X.shape[0] * np.sum(y_pred - Y)
+
+            self.weights -= self.learning_rate * dw
+            self.bias -= self.learning_rate * db
+            
+            loss = -1/X.shape[0] * np.sum(Y * np.log(y_pred) + (1-Y) * np.log(1-y_pred))
+            print(f'Epoch {epoch+1}, Loss: {loss}')
+        return self.weights, self.bias
         
     
     def predict(self, X):
         # Add your code here!
-        raise Exception("Must be implemented")
+        z = np.dot(X, self.weights) + self.bias
+        y_pred = 1 / (1 + np.exp(-z))
+        result = [1 if i > 0.5 else 0 for i in y_pred]
+        return result
 
 
 # you can change the following line to whichever classifier you want to use for
