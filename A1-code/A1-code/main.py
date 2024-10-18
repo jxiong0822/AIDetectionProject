@@ -112,13 +112,15 @@ def main():
     print("===== Test Accuracy =====")
     maxtest, mintest, restest = model.predict(X_test)
     accuracy(restest, Y_test)
-    print("Max Ratios:\n")
-    for ratio, element in maxtest:
-        print(f"ratio is {ratio}, element is {list(WordTable.keys())[element]}\n")
+
+    if args.model == "NaiveBayes":
+        print("Max Ratios:\n")
+        for ratio, element in maxtest:
+            print(f"ratio is {ratio}, element is {list(WordTable.keys())[element]}\n")
     
-    print("Min Ratios:\n")
-    for ratio, element in mintest:
-        print(f"ratio is {ratio}, element is {list(WordTable.keys())[element]}\n")
+        print("Min Ratios:\n")
+        for ratio, element in mintest:
+            print(f"ratio is {ratio}, element is {list(WordTable.keys())[element]}\n")
         
     
     print("Time for training, dev, and test: %.2f seconds" % (time.time() - start_time))

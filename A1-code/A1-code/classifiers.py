@@ -151,7 +151,7 @@ class LogisticRegressionClassifier(BinaryClassifier):
         z = np.dot(X, self.weights) + self.bias
         y_pred = 1 / (1 + np.exp(-z))
         result = [1 if i > 0.5 else 0 for i in y_pred]
-        return result
+        return [0], [0], result
 
 
 # you can change the following line to whichever classifier you want to use for
