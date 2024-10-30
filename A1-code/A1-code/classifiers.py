@@ -63,9 +63,6 @@ class NaiveBayesClassifier(BinaryClassifier):
         self.Y = list(Y)
         self.pos_features = [0] * len(X[0])
         self.neg_features = [0] * len(X[0])
-        # print(X)
-        # print(Y)
-        # raise Exception("Must be implemented")
         for row in range(len(Y)):
             # if positive review
             if Y[row] == 1:
@@ -78,11 +75,7 @@ class NaiveBayesClassifier(BinaryClassifier):
                     self.neg_features[vals] += int(X[row][vals] + 1)
                     self.neg_total_counts += int(X[row][vals] + 1)
                     self.total_samples += int(X[row][vals] + 1)
-                    
-        #print(self.neg_features)
-        #print("\n\n")
-        #print(self.pos_features)
-        # print("\n\n\n\n\n")
+            
     
     def predict(self, X):
         """Predict class labels for the given test data X"""
@@ -102,13 +95,9 @@ class NaiveBayesClassifier(BinaryClassifier):
                     neg_predict_count += neg_temp
                     ratio = pos_temp/neg_temp
                     tup = (ratio, element)
-                    # ratios.append(tup)
                     ratios.add(tup)
                     
-                    # (+/-_features * 0.5) / (+/-_features * +/-_total_count)/total_samples
-            #print("pos is %s, neg is %s\n", pos_predict_count, neg_predict_count)
             output.append(1 if pos_predict_count > neg_predict_count else 0)
-        # print(output)
         ratios = sorted(ratios)
         max_ratios = ratios[len(ratios) - 10:]
         min_ratios = ratios[:10]
@@ -123,25 +112,25 @@ class LogisticRegressionClassifier(BinaryClassifier):
     def __init__(self):
         # Add your code here!
         self.learning_rate = 0.15
-        self.epochs = 5000
+        self.epochs = 2500
         self.weights = None
         self.bias = None        
-
+        self.l2_lambda = 0.001
     def fit(self, X, Y):
         # Add your code here!
         self.weights = np.zeros(X.shape[1])
         self.bias = 0
         for epoch in range(self.epochs):
-            z = np.dot(X, self.weights) + self.bias
-            y_pred = 1 / (1 + np.exp(-z))
+            z = np.dot(X, self.weights) + self.bias 
+            y_pred = 1 / (1 + np.exp(-z)) 
 
-            dw = 1/X.shape[0] * np.dot(X.T, (y_pred - Y)) 
-            db = 1/X.shape[0] * np.sum(y_pred - Y)
+            dw = 1/X.shape[0] * np.dot(X.T, (y_pred - Y)) + (self.l2_lambda * self.weights)
+            db = 1/X.shape[0] * np.sum(y_pred - Y) 
 
-            self.weights -= self.learning_rate * dw
-            self.bias -= self.learning_rate * db
+            self.weights -= self.learning_rate * dw 
+            self.bias -= self.learning_rate * db 
             
-            loss = -1/X.shape[0] * np.sum(Y * np.log(y_pred) + (1-Y) * np.log(1-y_pred))
+            loss = -1/X.shape[0] * np.sum(Y * np.log(y_pred) + (1-Y) * np.log(1-y_pred)) + self.l2_lambda/2 * np.sum(self.weights**2)
             print(f'Epoch {epoch+1}, Loss: {loss}')
         return self.weights, self.bias
         

@@ -72,9 +72,9 @@ def main():
     
     # find random X_DEV
     
-    num = random.randint(0, len(X_dev) - 10)
-    X_dev = X_dev[num:num + 10]
-    Y_dev = Y_dev[num:num + 10]
+    #num = random.randint(0, len(X_dev) - 10)
+   #X_dev = X_dev[num:num + 10]
+    #Y_dev = Y_dev[num:num + 10]
     # print(X_dev, Y_dev)
     # print("\n\n\n\n\n")
     # print(Y_dev)
