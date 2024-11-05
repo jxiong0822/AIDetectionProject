@@ -1,0 +1,4 @@
+Namespace(feature='trigram', path='./1b_benchmark')
+Train Data:  10804.077018257081
+Dev Data:  17368.41646916367
+Test Data:  17288.571457216138

@@ -1,0 +1,4 @@
+Namespace(feature='bigram', path='./1b_benchmark')
+Train Data:  2229.2220508462065
+Dev Data:  2580.8336154556855
+Test Data:  2568.720557771097
