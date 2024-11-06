@@ -40,61 +40,70 @@ class FeatureExtractor(object):
     def transform_list(self, text_set):
         pass
 
-
-
 class UnigramFeature():
-    """Example code for unigram feature extraction
-    """
+    """Implementation of unigram feature extraction with MLE and perplexity calculation"""
     def __init__(self):
         self.unigram_counts = {}
-    
-    def fit(self, text_set):
 
-        all_words = [word for text in text_set for word in text]
-        self.total_words = len(all_words)
-        self.total_sentences = len(text_set)
+    def fit(self, text_set: list):
+        self.data = text_set
 
-        self.word_freq = Counter(all_words)
+        all_words = [word for sentence in self.data for word in sentence]
 
-        for sentence in text_set:
+        self.all_words_count= Counter(all_words)
+        # print(self.all_words_count)
+
+        for sentence in self.data:
             for word in sentence:
-                if self.word_freq[word] < 3:
-                    if '<UNK>' in self.unigram_counts:
-                        self.unigram_counts['<UNK>'] += self.word_freq[word]
-                    else:
-                        self.unigram_counts['<UNK>'] = self.word_freq[word]
+                if self.all_words_count[word] < 3:
+                        word = '<UNK>'
+                if word not in self.unigram_counts:
+                    self.unigram_counts[word] = 1
                 else:
-                    self.unigram_counts[word] = self.word_freq[word]
-        
-        self.unigram_counts['<STOP>'] = len(text_set)
-        
+                    if self.all_words_count[word] < 3:
+                        word = '<UNK>'
+                    self.unigram_counts[word] += 1
+
+        self.unigram_counts['<STOP>'] = len(self.data)
+
         print(len(self.unigram_counts))
+
         return self.unigram_counts
+        
     
-    def MLE(self):
-        """Calculate Maximum Likelihood Estimation for unigram model with additive smoothing."""
-        vocab_size = len(self.unigram_counts)
-        self.unigram_prob = {word: (count + 1) / (self.total_words + vocab_size) for word, count in self.unigram_counts.items()}
-        for word in self.unigram_prob:
-            if (word == '<UNK>') or (word == '<STOP>'):
-                print(word, self.unigram_prob[word])
-        return self.unigram_prob
-    
-    def perplexity(self, text_set):
-        log_sum = 0
-        unigram_prob = self.MLE()
-        total_test_tokens = sum(len(sentence) + 1 for sentence in text_set)
+    def MLE(self, alpha):
+        self.probs = {}
+        self.vocab_size = len(self.unigram_counts)
+        self.total_words = sum(self.unigram_counts.values())
 
-        for sentence in text_set:
+        for word in self.unigram_counts:
+            self.probs[word] = (self.unigram_counts[word] + alpha) / (self.total_words + alpha * self.vocab_size)
+
+
+        if '<UNK>' in self.unigram_counts:
+            self.probs['<UNK>'] = (self.unigram_counts['<UNK>'] + alpha) / (self.total_words + alpha * self.vocab_size)
+        else:
+            self.probs['<UNK>'] = alpha / (self.total_words + alpha * self.vocab_size)
+        
+        return self.probs
+
+    def perplexity(self, test_data, alpha):
+        log_prob_sum = 0
+        word_count = 0
+        processed_data = []
+        for sentence in test_data:
             for word in sentence:
-                if word in self.unigram_prob:
-                    log_sum += math.log2(unigram_prob[word])
-                if word not in self.unigram_prob:
-                    log_sum += math.log2(self.unigram_prob['<UNK>'])
-
-        log_sum += math.log2(unigram_prob['<STOP>'])
-
-        return 2 ** (-log_sum / total_test_tokens)
+                processed_data.append(word)
+                word_count += 1
+            processed_data.append('<STOP>')
+        
+        probs = self.MLE(alpha)
+        for word in processed_data:
+            prob = probs.get(word, probs['<UNK>'])
+            if prob > 0:
+                log_prob_sum += math.log2(prob)
+        
+        return 2 ** -(log_prob_sum / len(processed_data))
 
 
 class BigramFeature(FeatureExtractor):
@@ -128,7 +137,7 @@ class BigramFeature(FeatureExtractor):
                     self.unigram_counts[bigram[0]] += 1
         return self.bigram_counts
 
-    def MLE(self, bigram):
+    def MLE(self, bigram, alpha):
         """Calculate MLE probability for a bigram with additive smoothing."""
         context = bigram[0]
         vocab_size = len(self.vocab)
@@ -136,7 +145,7 @@ class BigramFeature(FeatureExtractor):
         unigram_count = self.unigram_counts.get(context, 0)
         return (bigram_count + 1) / (unigram_count + vocab_size)
     
-    def perplexity(self, test_data):
+    def perplexity(self, test_data, alpha):
         """Calculate perplexity on test data."""
         processed_data = [[word if word in self.vocab else '<UNK>' for word in sentence] + ['<STOP>']
             for sentence in test_data
@@ -147,7 +156,7 @@ class BigramFeature(FeatureExtractor):
         for sentence in processed_data:
             for i in range(len(sentence) - 1):
                 bigram = (sentence[i], sentence[i + 1])
-                prob = self.MLE(bigram)
+                prob = self.MLE(bigram, alpha)
                 if prob > 0:
                     log_prob_sum += math.log2(prob)
                 token_count += 1

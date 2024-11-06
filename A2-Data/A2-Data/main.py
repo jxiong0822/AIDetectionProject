@@ -63,12 +63,14 @@ def main():
     else:
         raise Exception("Pass unigram, bigram or customized to --feature")
     
+    a = 0
     feat_extractor.fit(X_train_data)
-    p1 = feat_extractor.perplexity(X_train_data)
+    # feat_extractor.MLE(a)
+    p1 = feat_extractor.perplexity(X_train_data, a)
     print("Train Data: ", p1)
-    p2 = feat_extractor.perplexity(X_dev_data)
+    p2 = feat_extractor.perplexity(X_dev_data, a)
     print("Dev Data: ", p2)
-    p3 = feat_extractor.perplexity(X_test_data)
+    p3 = feat_extractor.perplexity(X_test_data, a)
     print("Test Data: ", p3)
     
     # find random X_DEV
