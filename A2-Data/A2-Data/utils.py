@@ -2,6 +2,7 @@ from nltk.tokenize import regexp_tokenize
 import numpy as np
 from collections import Counter, defaultdict
 import math
+import copy
 
 # Here is a default pattern for tokenization; you can substitute it with yours
 default_pattern =  r"""(?x)                  
@@ -46,123 +47,161 @@ class UnigramFeature():
         self.unigram_counts = {}
 
     def fit(self, text_set: list):
-        self.data = text_set
-
-        all_words = [word for sentence in self.data for word in sentence]
-
-        self.all_words_count= Counter(all_words)
-        # print(self.all_words_count)
-
+        self.data = copy.deepcopy(text_set)
         for sentence in self.data:
-            for word in sentence:
-                if self.all_words_count[word] < 3:
-                        word = '<UNK>'
+            sentence.append('<STOP>')
+            sentence.insert(0, '<START>')
+        all_words = [word for text in self.data for word in text]
+
+        self.all_words_freq = Counter(all_words)
+
+        processed_data = []
+        for word in all_words:
+            if self.all_words_freq[word] < 3:
+                processed_data.append('<UNK>')
+            else:
+                processed_data.append(word)
+        
+        for word in processed_data:
+            if word != '<START>':
                 if word not in self.unigram_counts:
                     self.unigram_counts[word] = 1
                 else:
-                    if self.all_words_count[word] < 3:
-                        word = '<UNK>'
                     self.unigram_counts[word] += 1
-
-        self.unigram_counts['<STOP>'] = len(self.data)
-
-        print(len(self.unigram_counts))
+        
+        self.total_words = sum(self.unigram_counts.values())
+        self.vocab_size = len(self.unigram_counts)
+        self.vocab = set(self.unigram_counts.keys())
 
         return self.unigram_counts
         
-    
+
     def MLE(self, alpha):
-        self.probs = {}
-        self.vocab_size = len(self.unigram_counts)
-        self.total_words = sum(self.unigram_counts.values())
-
+        self.prob = {}
         for word in self.unigram_counts:
-            self.probs[word] = (self.unigram_counts[word] + alpha) / (self.total_words + alpha * self.vocab_size)
-
-
-        if '<UNK>' in self.unigram_counts:
-            self.probs['<UNK>'] = (self.unigram_counts['<UNK>'] + alpha) / (self.total_words + alpha * self.vocab_size)
-        else:
-            self.probs['<UNK>'] = alpha / (self.total_words + alpha * self.vocab_size)
+            self.prob[word] = (self.unigram_counts[word] + alpha) / (self.total_words + (alpha * self.vocab_size))
         
-        return self.probs
+        self.prob['<UNK>'] = (alpha) / (self.total_words + (alpha * self.vocab_size))
+
+        return self.prob
 
     def perplexity(self, test_data, alpha):
-        log_prob_sum = 0
-        word_count = 0
-        processed_data = []
-        for sentence in test_data:
-            for word in sentence:
-                processed_data.append(word)
-                word_count += 1
-            processed_data.append('<STOP>')
+        self.test_data = copy.deepcopy(test_data)
+
+        for sentence in self.test_data:
+            sentence.append('<STOP>')
         
+        self.test_words = [word for text in self.test_data for word in text]
+        total_words = len(self.test_words)
+
         probs = self.MLE(alpha)
-        for word in processed_data:
-            prob = probs.get(word, probs['<UNK>'])
+        log_prob = 0
+
+        for word in self.test_words:
+            if word not in probs.keys():
+                word = '<UNK>'
+            prob = probs[word]
             if prob > 0:
-                log_prob_sum += math.log2(prob)
+                log_prob += math.log2(prob)
         
-        return 2 ** -(log_prob_sum / len(processed_data))
+        perplexity = 2**(-log_prob / total_words)
 
-
-class BigramFeature(FeatureExtractor):
-    """Bigram feature extractor analogous to the unigram one.
-    """
+        return perplexity
+            
+class BigramFeature:
+    """Bigram feature extractor analogous to the unigram one."""
     def __init__(self):
-        # Add your code here!
         self.bigram_counts = {}
         self.unigram_counts = {}
         self.vocab = set()
 
     def fit(self, text_set: list):
-        self.data = text_set
+        self.data = copy.deepcopy(text_set)
 
-        word_counts = Counter([word for sentence in self.data for word in sentence])
-        self.vocab = {word if count >= 3 else '<UNK>' for word, count in word_counts.items()}
-        processed_data = [[word if word in self.vocab else '<UNK>' for word in sentence] + ['<STOP>']
-            for sentence in self.data
-        ]
+        for sentence in self.data:
+            sentence.append('<STOP>')
+            sentence.insert(0, '<START>')
+
+        all_words = [word for text in self.data for word in text]
+
+        self.all_words_freq = Counter(all_words)
+
+        processed_data = []
+        for word in all_words:
+            if self.all_words_freq[word] < 3:
+                processed_data.append('<UNK>')
+            else:
+                processed_data.append(word)
         
-        for sentence in processed_data:
-            for i in range(len(sentence) - 1):
-                bigram = (sentence[i], sentence[i + 1])
-                if bigram not in self.bigram_counts:
-                    self.bigram_counts[bigram] = 1
-                else:
-                    self.bigram_counts[bigram] += 1
-                if bigram[0] not in self.unigram_counts:
-                    self.unigram_counts[bigram[0]] = 1
-                else:
-                    self.unigram_counts[bigram[0]] += 1
+        for word in processed_data:
+            if word not in self.unigram_counts:
+                self.unigram_counts[word] = 1
+            else:
+                self.unigram_counts[word] += 1
+
+        self.vocab = set(self.unigram_counts.keys())
+        self.vocab_size = len(self.vocab)
+        self.total_words = sum(self.unigram_counts.values())
+
+        for i in range(1, len(processed_data)):
+            bigram = (processed_data[i-1], processed_data[i])
+            if bigram not in self.bigram_counts:
+                self.bigram_counts[bigram] = 1
+            else:
+                self.bigram_counts[bigram] += 1
+
         return self.bigram_counts
 
-    def MLE(self, bigram, alpha):
-        """Calculate MLE probability for a bigram with additive smoothing."""
-        context = bigram[0]
-        vocab_size = len(self.vocab)
-        bigram_count = self.bigram_counts.get(bigram, 0)
-        unigram_count = self.unigram_counts.get(context, 0)
-        return (bigram_count + 1) / (unigram_count + vocab_size)
-    
+    def MLE(self, alpha):
+        """Calculate MLE with smoothing."""
+        self.probs = {}
+        for bigram in self.bigram_counts:
+            probablity = (self.bigram_counts[bigram] + alpha) / (self.unigram_counts[bigram[0]] + (alpha * self.vocab_size))
+            self.probs[bigram] = probablity
+            self.probs[('<UNK>', bigram[1])] = alpha / (self.unigram_counts[bigram[0]] + (alpha * self.vocab_size))
+            self.probs[('<UNK>', '<UNK>')] = alpha / (self.unigram_counts['<UNK>'] + (alpha * self.vocab_size))
+            self.probs[(bigram[0], '<UNK>')] = alpha / (self.unigram_counts[bigram[0]] + (alpha * self.vocab_size))
+
+        return self.probs
+
     def perplexity(self, test_data, alpha):
-        """Calculate perplexity on test data."""
-        processed_data = [[word if word in self.vocab else '<UNK>' for word in sentence] + ['<STOP>']
-            for sentence in test_data
-        ]
-        log_prob_sum = 0
-        token_count = 0
+        """Calculate perplexity on the test data."""
+        # Preprocess test data by adding <START> and <STOP> and replacing rare words with <UNK>
+        self.test_data = copy.deepcopy(test_data)
+
+        for sentence in self.test_data:
+            sentence.append('<STOP>')
+            sentence.insert(0, '<START>')
         
-        for sentence in processed_data:
-            for i in range(len(sentence) - 1):
-                bigram = (sentence[i], sentence[i + 1])
-                prob = self.MLE(bigram, alpha)
-                if prob > 0:
-                    log_prob_sum += math.log2(prob)
-                token_count += 1
-        
-        return 2 ** (-log_prob_sum / token_count)
-        
+
+
+        self.test_words = [word for text in self.test_data for word in text]
+        total_words = len(self.test_words)
+
+        probs = self.MLE(alpha)
+        log_prob = 0
+
+        for i in range(1, len(self.test_words)):
+            if self.test_words[i] not in self.vocab:
+                self.test_words[i] = '<UNK>'
+            if self.test_words[i-1] not in self.vocab:
+                self.test_words[i-1] = '<UNK>'
+            bigram = (self.test_words[i-1], self.test_words[i])
+            if bigram not in probs.keys():
+                bigram = ('<UNK>', self.test_words[i])
+            if bigram not in probs.keys():
+                bigram = (self.test_words[i-1], '<UNK>')
+            if bigram not in probs.keys():
+                bigram = ('<UNK>', '<UNK>')
+            prob = probs[bigram]
+            if prob > 0:
+                log_prob += math.log2(prob)
+
+        perplexity = 2**(-log_prob / total_words)
+
+        return perplexity
+
+            
 class Trigram(FeatureExtractor):
     def __init__(self):
         self.trigram = {}
@@ -188,49 +227,131 @@ class Trigram(FeatureExtractor):
 
         
     def fit(self, text_set: list):
-        self.data = text_set
-        word_counts = Counter([word for sentence in self.data for word in sentence])
-        self.vocab = {word if count >= 3 else '<UNK>' for word, count in word_counts.items()}
-        processed_data = [[word if word in self.vocab else '<UNK>' for word in sentence] + ['<STOP>'] for sentence in self.data
-        ]
-        
-        for sentence in processed_data:
-            for i in range(len(sentence) - 2):
-                trigram = (sentence[i], sentence[i + 1], sentence[i + 2])
-                bigram = (sentence[i], sentence[i + 1])
-                if trigram not in self.trigram_counts:
-                    self.trigram_counts[trigram] = 1
-                else:
-                    self.trigram_counts[trigram] += 1
-                if bigram not in self.bigram_counts:
-                    self.bigram_counts[bigram] = 1
-                else:
-                    self.bigram_counts[bigram] += 1
+        self.data = copy.deepcopy(text_set)
+
+        for sentence in self.data:
+            sentence.append('<STOP>')
+            sentence.insert(0, '<START>')
+            sentence.insert(0, '<START>')
+
+        all_words = [word for text in self.data for word in text]
+
+        self.all_words_freq = Counter(all_words)
+
+        processed_data = []
+        for word in all_words:
+            if self.all_words_freq[word] < 3:
+                processed_data.append('<UNK>')
+            else:
+                processed_data.append(word)
+
+        for word in processed_data:
+            if word not in self.vocab:
+                self.vocab.add(word)
+
+        for i in range(1, len(processed_data)):
+            bigram = (processed_data[i-1], processed_data[i])
+            if bigram not in self.bigram_counts:
+                self.bigram_counts[bigram] = 1
+            else:
+                self.bigram_counts[bigram] += 1
+
+        for i in range(2, len(processed_data)):
+            trigram = (processed_data[i-2], processed_data[i-1], processed_data[i])
+            if trigram not in self.trigram_counts:
+                self.trigram_counts[trigram] = 1
+            else:
+                self.trigram_counts[trigram] += 1
+
         return self.trigram_counts
 
-    def MLE(self, trigram):
-        """Calculate MLE probability for a trigram with additive smoothing."""
-        context = trigram[:2]
-        vocab_size = len(self.vocab)
-        trigram_count = self.trigram_counts.get(trigram, 0)
-        bigram_count = self.bigram_counts.get(context, 0)
-        return (trigram_count + 1) / (bigram_count + vocab_size)
-    
-    def perplexity(self, test_data):
-        """Calculate perplexity on test data."""
-        processed_data = [[word if word in self.vocab else '<UNK>' for word in sentence] + ['<STOP>']
-            for sentence in test_data
-        ]
-        log_prob_sum = 0
-        token_count = 0
-        
-        for sentence in processed_data:
-            for i in range(2, len(sentence)):
-                trigram = (sentence[i - 2], sentence[i - 1], sentence[i])
-                prob = self.MLE(trigram)
-                if prob > 0:
-                    log_prob_sum += math.log2(prob)
-                token_count += 1
-        
-        return 2 ** (-log_prob_sum / token_count)
+    def MLE(self, alpha):
+        self.probs = {}
+        for trigram in self.trigram_counts:
+            bigram = (trigram[0], trigram[1])
+            probablity = (self.trigram_counts[trigram] + alpha) / (self.bigram_counts[bigram] + (alpha * len(self.vocab)))
+            self.probs[trigram] = probablity
+            self.probs[('<UNK>', trigram[1], trigram[2])] = alpha / (self.bigram_counts[bigram] + (alpha * len(self.vocab)))
+            self.probs[(trigram[0], '<UNK>', trigram[2])] = alpha / (self.bigram_counts[bigram] + (alpha * len(self.vocab)))
+            self.probs[(trigram[0], trigram[1], '<UNK>')] = alpha / (self.bigram_counts[bigram] + (alpha * len(self.vocab)))
+            self.probs[('<UNK>', '<UNK>', trigram[2])] = alpha / (self.bigram_counts[bigram] + (alpha * len(self.vocab)))
+            self.probs[('<UNK>', trigram[1], '<UNK>')] = alpha / (self.bigram_counts[bigram] + (alpha * len(self.vocab)))
+            self.probs[(trigram[0], '<UNK>', '<UNK>')] = alpha / (self.bigram_counts[bigram] + (alpha * len(self.vocab)))
+            self.probs[('<UNK>', '<UNK>', '<UNK>')] = alpha / (self.bigram_counts[bigram] + (alpha * len(self.vocab)))
 
+        return self.probs
+
+    def perplexity(self, test_data, alpha):
+        self.test_data = copy.deepcopy(test_data)
+
+        for sentence in self.test_data:
+            sentence.append('<STOP>')
+            sentence.insert(0, '<START>')
+
+        self.test_words = [word for text in self.test_data for word in text]
+        total_words = len(self.test_words)
+
+        probs = self.MLE(alpha)
+        log_prob = 0
+
+        for i in range(2, len(self.test_words)):
+            if self.test_words[i] not in self.vocab:
+                self.test_words[i] = '<UNK>'
+            if self.test_words[i-1] not in self.vocab:
+                self.test_words[i-1] = '<UNK>'
+            if self.test_words[i-2] not in self.vocab:
+                self.test_words[i-2] = '<UNK>'
+            trigram = (self.test_words[i-2], self.test_words[i-1], self.test_words[i])
+            if trigram not in probs.keys():
+                trigram = ('<UNK>', self.test_words[i-1], self.test_words[i])
+            if trigram not in probs.keys():
+                trigram = (self.test_words[i-2], '<UNK>', self.test_words[i])
+            if trigram not in probs.keys():
+                trigram = (self.test_words[i-2], self.test_words[i-1], '<UNK>')
+            if trigram not in probs.keys():
+                trigram = ('<UNK>', '<UNK>', self.test_words[i])
+            if trigram not in probs.keys():
+                trigram = ('<UNK>', self.test_words[i-1], '<UNK>')
+            if trigram not in probs.keys():
+                trigram = (self.test_words[i-2], '<UNK>', '<UNK>')
+            if trigram not in probs.keys():
+                trigram = ('<UNK>', '<UNK>', '<UNK>')
+            prob = probs[trigram]
+            if prob > 0:
+                log_prob += math.log2(prob)
+
+        perplexity = 2**(-log_prob / total_words)
+
+        return perplexity
+
+def interpolation(unigram, bigram, trigram, test_data, l1, l2, l3):
+    probs = {}
+    unigram_probs = unigram.MLE(0)
+    bigram_probs = bigram.MLE(0)
+    trigram_probs = trigram.MLE(0)
+
+    for word in unigram_probs:
+        probs[word] = l1 * unigram_probs[word]
+        probs[word] += l2 * bigram_probs[word]
+        probs[word] += l3 * trigram_probs[word]
+
+    test_data = copy.deepcopy(test_data)
+
+    for sentence in test_data:
+        sentence.append('<STOP>')
+        sentence.insert(0, '<START>')
+
+    test_words = [word for text in test_data for word in text]
+
+    log_prob = 0
+
+    for word in test_words:
+        if word not in probs.keys():
+            word = '<UNK>'
+        prob = probs[word]
+        if prob > 0:
+            log_prob += math.log2(prob)
+    
+    perplexity = 2**(-log_prob / len(test_words))
+
+    return perplexity
